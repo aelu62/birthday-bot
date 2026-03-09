@@ -106,8 +106,9 @@ async def check_birthdays():
     # 오늘 생일인 사람이 있다면 축하 메시지 보내기!
     if birthday_users:
         mentions = " ".join(birthday_users)
-        await channel.send(f"🎉 **빰빠라밤! 오늘은 특별한 날이야!** 🎉\n{mentions} 님의 생일을 진심으로 축하해! 다들 한마디씩 축하해주자! 🎂🎁")
+        await channel.send(f"🎉 **와아아!! 오늘은 특별한 날이야!** 🎉\n{mentions} 님의 생일을 진심으로 축하해! 다들 한마디씩 축하해주자! 🎂🎁")
 
 # 봇 실행
 
 bot.run(os.environ['BOT_TOKEN'])
+
