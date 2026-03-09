@@ -1,0 +1,112 @@
+import discord
+from discord.ext import commands, tasks
+import json
+import os
+import datetime
+
+# 봇 기본 설정
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# 생일 데이터 파일
+DATA_FILE = 'birthdays.json'
+
+# --- ⚙️ 설정 구역 ⚙️ ---
+# 생일 축하 메시지를 보낼 채널 ID (따옴표 없이 숫자만 적어줘!)
+ANNOUNCE_CHANNEL_ID = 1480495599479423016 
+# -------------------------
+
+# 데이터 불러오기/저장하기 함수
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_data(data):
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+@bot.event
+async def on_ready():
+    print(f'{bot.user} (으)로 로그인 완료! 생일 파티 준비 끝! 🎂')
+    # 봇이 켜지면 매일 자정 알림 타이머를 시작해!
+    if not check_birthdays.is_running():
+        check_birthdays.start()
+
+@bot.command()
+async def 생일등록(ctx, date: str):
+    """사용법: !생일등록 03-09"""
+    # 날짜 형식을 간단히 검사 (길이가 5글자인지)
+    if len(date) != 5 or "-" not in date:
+        await ctx.send("양식이 틀렸어! `!생일등록 MM-DD` 형식으로 적어줘. (예: `!생일등록 03-09`)")
+        return
+
+    data = load_data()
+    user_id = str(ctx.author.id)
+    data[user_id] = date
+    save_data(data)
+    await ctx.send(f'{ctx.author.mention}님의 생일이 **{date}**로 등록되었어! 🥳')
+
+@bot.command()
+async def 생일확인(ctx):
+    """내 생일 확인"""
+    data = load_data()
+    user_id = str(ctx.author.id)
+    if user_id in data:
+        await ctx.send(f'{ctx.author.mention}님의 등록된 생일은 **{data[user_id]}**야! 🎉')
+    else:
+        await ctx.send(f'{ctx.author.mention}님의 생일이 아직 등록되지 않았어. `!생일등록 MM-DD` 로 먼저 등록해 줘!')
+
+@bot.command()
+async def 생일목록(ctx):
+    """서버원들의 전체 생일 목록 보기"""
+    data = load_data()
+    
+    # 등록된 데이터가 없을 경우
+    if not data:
+        await ctx.send("아직 등록된 생일이 하나도 없어! `!생일등록 MM-DD` 명령어로 첫 번째 주인공이 되어봐! 🥺")
+        return
+        
+    # 날짜(월-일) 순서대로 예쁘게 정렬하기!
+    sorted_birthdays = sorted(data.items(), key=lambda x: x[1])
+    
+    # 디스코드 '임베드'를 써서 깔끔한 박스 모양으로 만들기
+    embed = discord.Embed(title="📅 서버 생일 달력", description="우리 서버원들의 생일 목록이야!", color=discord.Color.gold())
+    
+    for user_id, date in sorted_birthdays:
+        # <@유저ID> 형식으로 넣으면 디스코드에서 자동으로 프로필 닉네임으로 바꿔서 보여줌
+        embed.add_field(name=f"🎂 {date}", value=f"<@{user_id}>", inline=False)
+        
+    await ctx.send(embed=embed)
+
+
+# --- 매일 자정(한국 시간 기준)에 실행되는 자동 알림 ---
+KST = datetime.timezone(datetime.timedelta(hours=9))
+target_time = datetime.time(hour=0, minute=0, tzinfo=KST)
+
+@tasks.loop(time=target_time)
+async def check_birthdays():
+    channel = bot.get_channel(1480495599479423016)
+    if not channel:
+        print("설정된 채널 ID가 잘못되었거나 봇이 채널을 볼 수 없어!")
+        return 
+
+    # 오늘 날짜 구하기 (예: 03-09)
+    today = datetime.datetime.now(KST).strftime('%m-%d')
+    data = load_data()
+    
+    # 오늘 생일인 사람 찾기
+    birthday_users = []
+    for user_id, date in data.items():
+        if date == today:
+            birthday_users.append(f"<@{user_id}>")
+    
+    # 오늘 생일인 사람이 있다면 축하 메시지 보내기!
+    if birthday_users:
+        mentions = " ".join(birthday_users)
+        await channel.send(f"🎉 **빰빠라밤! 오늘은 특별한 날이야!** 🎉\n{mentions} 님의 생일을 진심으로 축하해! 다들 한마디씩 축하해주자! 🎂🎁")
+
+# 봇 실행
+bot.run('BOT_TOKEN')
