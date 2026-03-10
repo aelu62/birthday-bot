@@ -66,19 +66,23 @@ async def check_birthday(ctx):
     else:
         await ctx.send(f'😥 아직 등록된 생일이 없어요. `!생일등록 MM-DD` (예: !생일등록 03-10) 명령어로 등록해 주세요!')
 
-# --- 📜 생일 목록 (모두의 생일) ---
+# --- 📜 생일 목록 (날짜 순서대로 정렬!) ---
 @bot.command(name='생일목록')
 async def list_birthdays(ctx):
-    users = collection.find()
+    # 몽고DB에서 모든 유저를 가져오는데, 'date'를 기준으로 오름차순(1) 정렬!
+    users = collection.find().sort("date", 1)
     
-    # 금고에 데이터가 하나도 없을 때
     if collection.count_documents({}) == 0:
-        await ctx.send("텅~ 아직 아무도 생일을 등록하지 않았어요! 첫 번째로 등록해 보세요!")
+        await ctx.send("텅~ 아직 아무도 생일을 등록하지 않았어요!")
         return
     
-    msg = "🎂 **우리 서버 생일 목록** 🎂\n"
+    msg = "🎂 **우리 서버 생일 목록 (날짜순)** 🎂\n"
+    msg += "---" * 10 + "\n"
+    
     for user in users:
-        msg += f"• **{user['name']}**님 : {user['date']}\n"
+        # 09-06 같은 날짜 형식을 더 보기 좋게 '9월 6일'로 바꾸고 싶다면 아래처럼 해도 돼!
+        msg += f"• **{user['date']}** : {user['name']}님\n"
+        
     await ctx.send(msg)
 
 # --- ⏰ 매일 자정에 자동 생일 축하 ---
@@ -106,6 +110,7 @@ async def check_birthday_loop():
 # --- 🔑 디스코드 봇 켜기 ---
 TOKEN = os.environ.get('BOT_TOKEN')
 bot.run(TOKEN)
+
 
 
 
