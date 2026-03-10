@@ -34,7 +34,7 @@ async def register_birthday(ctx, date: str):
         {'$set': {'date': date, 'name': ctx.author.name}}, 
         upsert=True
     )
-    await ctx.send(f'🎉 {ctx.author.name}님의 생일이 **{date}**로 안전한 금고(MongoDB)에 저장되었습니다!')
+    await ctx.send(f'🎉 {ctx.author.name}님의 생일이 **{date}**이구나!!
 
 # --- 🎂 생일 확인 명령어 ---
 @bot.command(name='생일확인')
@@ -53,3 +53,4 @@ async def check_birthday(ctx):
 # 클라우드타입에 적어둔 BOT_TOKEN을 가져와서 실행합니다.
 TOKEN = os.environ.get('BOT_TOKEN')
 bot.run(TOKEN)
+
