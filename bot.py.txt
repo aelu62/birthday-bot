@@ -61,7 +61,7 @@ async def check_birthday(ctx):
         
         # 3. 만약 오늘이 생일이라면? 깜짝 축하 파티! 🎉
         if user_data["date"] == today_str:
-            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖')
+            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖 다들 생일축하해주세요🎊')
             
     else:
         await ctx.send(f'😥 아직 등록된 생일이 없어요. `!생일등록 MM-DD` (예: !생일등록 03-10) 명령어로 등록해 주세요!')
@@ -106,5 +106,6 @@ async def check_birthday_loop():
 # --- 🔑 디스코드 봇 켜기 ---
 TOKEN = os.environ.get('BOT_TOKEN')
 bot.run(TOKEN)
+
 
 
