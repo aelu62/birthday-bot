@@ -48,9 +48,21 @@ async def register_birthday(ctx, date: str):
 @bot.command(name='생일확인')
 async def check_birthday(ctx):
     user_id = str(ctx.author.id)
+    
+    # 몽고DB에서 내 데이터 찾기
     user_data = collection.find_one({'_id': user_id})
+    
     if user_data:
+        # 1. 기본적으로 며칠인지 알려주기
         await ctx.send(f'📅 {ctx.author.name}님의 등록된 생일은 **{user_data["date"]}** 입니다!')
+        
+        # 2. 오늘 날짜 구하기 (한국 시간 기준)
+        today_str = datetime.now(KST).strftime("%m-%d")
+        
+        # 3. 만약 오늘이 생일이라면? 깜짝 축하 파티! 🎉
+        if user_data["date"] == today_str:
+            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖')
+            
     else:
         await ctx.send(f'😥 아직 등록된 생일이 없어요. `!생일등록 MM-DD` (예: !생일등록 03-10) 명령어로 등록해 주세요!')
 
@@ -94,3 +106,4 @@ async def check_birthday_loop():
 # --- 🔑 디스코드 봇 켜기 ---
 TOKEN = os.environ.get('BOT_TOKEN')
 bot.run(TOKEN)
+
