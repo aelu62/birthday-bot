@@ -10,7 +10,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # 생일 데이터 파일
-DATA_FILE = 'birthdays.json'
+DATA_FILE = '/data/birthdays.json'
 
 # --- ⚙️ 설정 구역 ⚙️ ---
 # 생일 축하 메시지를 보낼 채널 ID (따옴표 없이 숫자만 적어줘!)
@@ -130,5 +130,6 @@ async def check_birthdays():
 # 봇 실행
 
 bot.run(os.environ['BOT_TOKEN'])
+
 
 
