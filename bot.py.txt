@@ -91,17 +91,54 @@ async def change_birthday(ctx, date: str):
     await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 변경되었습니다!')
 
 
-# --- 🎂 생일 확인 (내 생일) ---
+# --- 🎂 생일 확인 (디데이 타이머 기능 추가!) ---
 @bot.command(name='생일확인')
 async def check_birthday(ctx):
     user_id = str(ctx.author.id)
     user_data = collection.find_one({'_id': user_id})
     
     if user_data:
-        await ctx.send(f'📅 {ctx.author.name}님의 등록된 생일은 **{user_data["date"]}** 입니다!')
-        today_str = datetime.now(KST).strftime("%m-%d")
-        if user_data["date"] == today_str:
-            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖 모두 축하해주세요')
+        bday_str = user_data["date"]
+        await ctx.send(f'📅 {ctx.author.name}님의 등록된 생일은 **{bday_str}** 입니다!')
+        
+        # 1. 오늘 날짜와 현재 시간 구하기 (한국 시간 기준)
+        now = datetime.now(KST)
+        today_date = now.date()
+        
+        # 2. 내 생일 날짜(월, 일) 숫자만 쏙 빼오기
+        try:
+            b_month, b_day = map(int, bday_str.split('-'))
+            # 올해의 내 생일 날짜 만들기
+            next_bday = datetime(now.year, b_month, b_day, tzinfo=KST).date()
+        except ValueError:
+            # 혹시 2월 29일(윤달)인데 올해가 윤년이 아닐 경우 3월 1일로 임시 계산
+            next_bday = datetime(now.year, 3, 1, tzinfo=KST).date()
+
+        # 3. 만약 올해 생일이 이미 지나갔다면? -> 내년 생일로 디데이 계산!
+        if next_bday < today_date:
+            try:
+                next_bday = datetime(now.year + 1, b_month, b_day, tzinfo=KST).date()
+            except ValueError:
+                next_bday = datetime(now.year + 1, 3, 1, tzinfo=KST).date()
+        
+        # 4. 며칠 남았는지 계산하기!
+        days_left = (next_bday - today_date).days
+        
+        # 5. 남은 날짜에 따라 봇의 반응이 달라집니다!
+        if days_left == 0:
+            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖')
+            
+        elif days_left == 1:
+            # 내일이 생일이면, 오늘 자정(밤 12시)까지 남은 '시간' 계산!
+            midnight_tomorrow = datetime.combine(next_bday, time(0, 0), tzinfo=KST)
+            time_diff = midnight_tomorrow - now
+            hours_left = int(time_diff.total_seconds() // 3600)
+            
+            await ctx.send(f'두근두근... 😳 내일이 드디어 생일이에요! 자정까지 딱 **{hours_left}시간** 남았습니다! ⏳')
+            
+        else:
+            await ctx.send(f'생일까지 **D-{days_left}일** 남았어요! 캘린더에 별표 쳐두고 기다릴게요! 🗓️⭐')
+            
     else:
         await ctx.send(f'😥 아직 등록된 생일이 없어요. `!생일등록 MM-DD` (예: !생일등록 03-10) 명령어로 등록해 주세요!')
 
