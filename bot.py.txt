@@ -57,7 +57,7 @@ async def register_birthday(ctx, date: str):
     )
     check_data = collection.find_one({'_id': user_id})
     if check_data:
-        await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)이 저장되었습니다! 🛡️')
+        await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)이 저장되었습니다!')
     else:
         await ctx.send('⚠️ 에러: 몽고DB 서버에 데이터를 찾지 못했습니다.')
 
