@@ -69,7 +69,7 @@ async def register_birthday(ctx, date: str):
     if check_data:
         await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)변경 완료')
     else:
-        await ctx.send('⚠️ 에러: 몽고DB 서버에 데이터를 찾지 못했습니다.')
+        await ctx.send('⚠️ 에러:서버에 데이터를 찾지 못했습니다.')
 
 # --- 🔄 생일 변경 (수정 전용 명령어!) ---
 @bot.command(name='생일변경')
@@ -88,7 +88,7 @@ async def change_birthday(ctx, date: str):
         {'$set': {'date': date, 'name': ctx.author.name}}
     )
     
-    await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 성공적으로 변경되었습니다! 몽고DB 업데이트 완료! 🛡️')
+    await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 변경되었습니다!')
 
 
 # --- 🎂 생일 확인 (내 생일) ---
