@@ -59,7 +59,7 @@ async def register_birthday(ctx, date: str):
         {'$set': {'guild_id': guild_id, 'user_id': user_id, 'date': date, 'name': ctx.author.name}}, 
         upsert=True
     )
-    await ctx.send(f'🎉 {ctx.author.name}님의 생일(**{date}**)이 **{ctx.guild.name}** 저장되었습니다! ')
+    await ctx.send(f'🎉 {ctx.author.name}님의 생일(**{date}**)이 **{ctx.guild.name}** 에 저장되었습니다! ')
 
 # --- 🔄 생일 변경 ---
 @bot.command(name='생일변경')
