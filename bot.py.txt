@@ -15,7 +15,7 @@ MONGO_URL = os.environ.get('MONGO_URL')
 client = MongoClient(MONGO_URL)
 db = client['birthday_db']
 collection = db['users']
-settings_collection = db['settings'] # 💡 채널 설정을 저장할 새로운 금고 공간!
+settings_collection = db['settings']
 
 # --- 🚀 봇이 켜졌을 때 ---
 @bot.event
@@ -26,159 +26,141 @@ async def on_ready():
 
 # --- 🛠️ 생일 축하 채널 설정 (👑 관리자 전용) ---
 @bot.command(name='생일채널설정')
-@commands.has_permissions(administrator=True) # 관리자 권한이 있는 사람만 허용!
+@commands.has_permissions(administrator=True)
 async def set_birthday_channel(ctx, channel: discord.TextChannel = None):
-    # 채널을 멘션하지 않으면, 명령어를 친 현재 채널을 기본으로 설정해.
     if channel is None:
         channel = ctx.channel
-        
-    # 몽고DB에 서버 아이디와 채널 아이디를 단단히 저장!
     settings_collection.update_one(
         {'_id': str(ctx.guild.id)},
         {'$set': {'channel_id': str(channel.id)}},
         upsert=True
     )
-    await ctx.send(f'📢 띠링! 앞으로 자동 생일 축하 메시지는 {channel.mention} 채널에만 올라옵니다! (관리자 설정 완료 🛠️)')
+    await ctx.send(f'📢 띠링! 이 서버의 자동 생일 축하 메시지는 {channel.mention} 채널에만 올라옵니다! 🛠️')
 
-# 관리자가 아닌 사람이 명령어를 쳤을 때 차단하는 기능
 @set_birthday_channel.error
 async def set_birthday_channel_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 삐빅! 이 명령어는 서버 관리자만 사용할 수 있어요!")
 
-# --- 🎂 생일 등록 (중복 방지 기능 추가!) ---
+# --- 🎂 생일 등록 (서버별 독립 저장!) ---
 @bot.command(name='생일등록')
 async def register_birthday(ctx, date: str):
+    guild_id = str(ctx.guild.id)
     user_id = str(ctx.author.id)
+    doc_id = f"{guild_id}_{user_id}" # 서버아이디와 유저아이디를 합쳐서 고유 열쇠 만들기!
     
-    # 1. 이미 금고에 내 데이터가 있는지 먼저 슬쩍 확인!
-    existing_user = collection.find_one({'_id': user_id})
+    existing_user = collection.find_one({'_id': doc_id})
     if existing_user:
-        await ctx.send(f'⚠️ {ctx.author.name}님은 이미 생일(**{existing_user["date"]}**)이 등록되어 있어요! 변경을 원하시면 `!생일변경 MM-DD` 명령어를 사용해 주세요.')
-        return # 등록 중단!
-        
-    # 2. 등록된 적이 없다면 몽고DB에 저장!
-    collection.update_one(
-        {'_id': user_id}, 
-        {'$set': {'date': date, 'name': ctx.author.name}}, 
-        upsert=True
-    )
-    
-    # 3. 잘 들어갔는지 확인!
-    check_data = collection.find_one({'_id': user_id})
-    if check_data:
-        await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)변경 완료')
-    else:
-        await ctx.send('⚠️ 에러:서버에 데이터를 찾지 못했습니다.')
-
-# --- 🔄 생일 변경 (수정 전용 명령어!) ---
-@bot.command(name='생일변경')
-async def change_birthday(ctx, date: str):
-    user_id = str(ctx.author.id)
-    
-    # 1. 진짜 등록된 적이 있는지 확인!
-    existing_user = collection.find_one({'_id': user_id})
-    if not existing_user:
-        await ctx.send(f'😥 아직 등록된 생일이 없어요. 변경할 생일이 없으니 `!생일등록 MM-DD` 명령어로 먼저 등록해 주세요!')
+        await ctx.send(f'⚠️ 이미 이 서버에 생일(**{existing_user["date"]}**)이 등록되어 있어요! 변경을 원하시면 `!생일변경 MM-DD`를 사용해 주세요.')
         return
         
-    # 2. 등록된 적이 있다면 새로운 날짜로 업데이트!
     collection.update_one(
-        {'_id': user_id}, 
+        {'_id': doc_id}, 
+        {'$set': {'guild_id': guild_id, 'user_id': user_id, 'date': date, 'name': ctx.author.name}}, 
+        upsert=True
+    )
+    await ctx.send(f'🎉 {ctx.author.name}님의 생일(**{date}**)이 **{ctx.guild.name}** 저장되었습니다! ')
+
+# --- 🔄 생일 변경 ---
+@bot.command(name='생일변경')
+async def change_birthday(ctx, date: str):
+    guild_id = str(ctx.guild.id)
+    user_id = str(ctx.author.id)
+    doc_id = f"{guild_id}_{user_id}"
+    
+    existing_user = collection.find_one({'_id': doc_id})
+    if not existing_user:
+        await ctx.send(f'😥 이 서버에는 아직 등록된 생일이 없어요. `!생일등록 MM-DD` 명령어로 먼저 등록해 주세요!')
+        return
+        
+    collection.update_one(
+        {'_id': doc_id}, 
         {'$set': {'date': date, 'name': ctx.author.name}}
     )
-    
-    await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 변경되었습니다!')
+    await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 성공적으로 변경되었습니다!')
 
-
-# --- 🎂 생일 확인 (디데이 타이머 기능 추가!) ---
+# --- 🎂 생일 확인 (디데이 타이머 포함) ---
 @bot.command(name='생일확인')
 async def check_birthday(ctx):
+    guild_id = str(ctx.guild.id)
     user_id = str(ctx.author.id)
-    user_data = collection.find_one({'_id': user_id})
+    doc_id = f"{guild_id}_{user_id}"
+    
+    user_data = collection.find_one({'_id': doc_id})
     
     if user_data:
         bday_str = user_data["date"]
         await ctx.send(f'📅 {ctx.author.name}님의 등록된 생일은 **{bday_str}** 입니다!')
         
-        # 1. 오늘 날짜와 현재 시간 구하기 (한국 시간 기준)
         now = datetime.now(KST)
         today_date = now.date()
         
-        # 2. 내 생일 날짜(월, 일) 숫자만 쏙 빼오기
         try:
             b_month, b_day = map(int, bday_str.split('-'))
-            # 올해의 내 생일 날짜 만들기
             next_bday = datetime(now.year, b_month, b_day, tzinfo=KST).date()
         except ValueError:
-            # 혹시 2월 29일(윤달)인데 올해가 윤년이 아닐 경우 3월 1일로 임시 계산
             next_bday = datetime(now.year, 3, 1, tzinfo=KST).date()
 
-        # 3. 만약 올해 생일이 이미 지나갔다면? -> 내년 생일로 디데이 계산!
         if next_bday < today_date:
             try:
                 next_bday = datetime(now.year + 1, b_month, b_day, tzinfo=KST).date()
             except ValueError:
                 next_bday = datetime(now.year + 1, 3, 1, tzinfo=KST).date()
         
-        # 4. 며칠 남았는지 계산하기!
         days_left = (next_bday - today_date).days
         
-        # 5. 남은 날짜에 따라 봇의 반응이 달라집니다!
         if days_left == 0:
-            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊 생일빵 대신 제 하트를 받으세요! 💖')
-            
+            await ctx.send(f'🎉 앗! 오늘이 바로 {ctx.author.name}님의 생일이네요! 정말정말 축하해요!! 🎂🎁🎊')
         elif days_left == 1:
-            # 내일이 생일이면, 오늘 자정(밤 12시)까지 남은 '시간' 계산!
             midnight_tomorrow = datetime.combine(next_bday, time(0, 0), tzinfo=KST)
             time_diff = midnight_tomorrow - now
             hours_left = int(time_diff.total_seconds() // 3600)
-            
             await ctx.send(f'두근두근... 😳 내일이 드디어 생일이에요! 자정까지 딱 **{hours_left}시간** 남았습니다! ⏳')
-            
         else:
-            await ctx.send(f'생일까지 **D-{days_left}일** 남았어요! 캘린더에 별표 쳐두고 기다릴게요! 🗓️⭐')
-            
+            await ctx.send(f'생일까지 **D-{days_left}일** 남았어요! 🗓️⭐')
     else:
-        await ctx.send(f'😥 아직 등록된 생일이 없어요. `!생일등록 MM-DD` (예: !생일등록 03-10) 명령어로 등록해 주세요!')
+        await ctx.send(f'😥 이 서버에는 아직 등록된 생일이 없어요. `!생일등록 MM-DD` 명령어로 등록해 주세요!')
 
-# --- 📜 생일 목록 (깔끔한 버전) ---
+# --- 📜 생일 목록 (현재 서버의 목록만 보여주기!) ---
 @bot.command(name='생일목록')
 async def list_birthdays(ctx):
-    users = collection.find().sort("date", 1)
-    if collection.count_documents({}) == 0:
-        await ctx.send("🎂 아직 등록된 생일이 없어요!")
+    guild_id = str(ctx.guild.id)
+    # 몽고DB에서 '이 서버(guild_id)'에 해당하는 사람만 찾아서 날짜순 정렬!
+    users = collection.find({'guild_id': guild_id}).sort("date", 1)
+    
+    if collection.count_documents({'guild_id': guild_id}) == 0:
+        await ctx.send("🎂 이 서버에는 아직 등록된 생일이 없어요!")
         return
     
-    msg = "🎂 **우리 서버 생일 목록** 🎂\n"
+    msg = f"🎂 **{ctx.guild.name} 서버 생일 목록** 🎂\n"
     msg += "━━━━━━━━━━━━━━━━━━\n"
     for user in users:
         msg += f"• **{user['date']}** : {user['name']}님\n"
     await ctx.send(msg)
 
-# --- ⏰ 매일 자정에 자동 생일 축하 (지정된 채널에만!) ---
+# --- ⏰ 매일 자정에 자동 생일 축하 (각 서버별로 따로따로!) ---
 @tasks.loop(time=time(hour=0, minute=0, tzinfo=KST))
 async def check_birthday_loop():
     today_str = datetime.now(KST).strftime("%m-%d")
-    birthday_users = list(collection.find({"date": today_str}))
     
-    if len(birthday_users) > 0:
-        for guild in bot.guilds:
-            # 몽고DB에서 이 서버에 '관리자가 설정한 채널'이 있는지 확인!
+    for guild in bot.guilds:
+        # 이 서버에서 오늘 생일인 사람만 쏙쏙 뽑아오기
+        birthday_users = list(collection.find({'guild_id': str(guild.id), 'date': today_str}))
+        
+        if len(birthday_users) > 0:
             guild_setting = settings_collection.find_one({'_id': str(guild.id)})
-            
             channel = None
             if guild_setting and 'channel_id' in guild_setting:
                 channel = guild.get_channel(int(guild_setting['channel_id']))
             else:
-                # 설정된 채널이 없으면 기본 시스템 채널로 보냄
                 channel = guild.system_channel
                 if not channel:
                     channel = guild.text_channels[0]
             
             if channel:
                 for user in birthday_users:
-                    await channel.send(f"🎉 **축하합니다!** 오늘은 <@{user['_id']}>님의 생일이에요! 모두 모여서 축하해 주세요! 🎂🎁")
+                    # user_id로 멘션하기
+                    await channel.send(f"🎉 **축하합니다!** 오늘은 <@{user['user_id']}>님의 생일이에요! 모두 모여서 축하해 주세요! 🎂🎁")
 
 # --- 🔑 디스코드 봇 켜기 ---
 TOKEN = os.environ.get('BOT_TOKEN')
