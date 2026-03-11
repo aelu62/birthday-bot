@@ -46,20 +46,50 @@ async def set_birthday_channel_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("🚫 삐빅! 이 명령어는 서버 관리자만 사용할 수 있어요!")
 
-# --- 🎂 생일 등록 ---
+# --- 🎂 생일 등록 (중복 방지 기능 추가!) ---
 @bot.command(name='생일등록')
 async def register_birthday(ctx, date: str):
     user_id = str(ctx.author.id)
+    
+    # 1. 이미 금고에 내 데이터가 있는지 먼저 슬쩍 확인!
+    existing_user = collection.find_one({'_id': user_id})
+    if existing_user:
+        await ctx.send(f'⚠️ {ctx.author.name}님은 이미 생일(**{existing_user["date"]}**)이 등록되어 있어요! 변경을 원하시면 `!생일변경 MM-DD` 명령어를 사용해 주세요.')
+        return # 등록 중단!
+        
+    # 2. 등록된 적이 없다면 몽고DB에 저장!
     collection.update_one(
         {'_id': user_id}, 
         {'$set': {'date': date, 'name': ctx.author.name}}, 
         upsert=True
     )
+    
+    # 3. 잘 들어갔는지 확인!
     check_data = collection.find_one({'_id': user_id})
     if check_data:
-        await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)이 저장되었습니다!')
+        await ctx.send(f'🎉 {check_data["name"]}님의 생일(**{check_data["date"]}**)이 몽고DB 서버에 완벽하게 저장된 것을 확인했습니다! 🛡️')
     else:
         await ctx.send('⚠️ 에러: 몽고DB 서버에 데이터를 찾지 못했습니다.')
+
+# --- 🔄 생일 변경 (수정 전용 명령어!) ---
+@bot.command(name='생일변경')
+async def change_birthday(ctx, date: str):
+    user_id = str(ctx.author.id)
+    
+    # 1. 진짜 등록된 적이 있는지 확인!
+    existing_user = collection.find_one({'_id': user_id})
+    if not existing_user:
+        await ctx.send(f'😥 아직 등록된 생일이 없어요. 변경할 생일이 없으니 `!생일등록 MM-DD` 명령어로 먼저 등록해 주세요!')
+        return
+        
+    # 2. 등록된 적이 있다면 새로운 날짜로 업데이트!
+    collection.update_one(
+        {'_id': user_id}, 
+        {'$set': {'date': date, 'name': ctx.author.name}}
+    )
+    
+    await ctx.send(f'🔄 {ctx.author.name}님의 생일이 **{date}**(으)로 성공적으로 변경되었습니다! 몽고DB 업데이트 완료! 🛡️')
+
 
 # --- 🎂 생일 확인 (내 생일) ---
 @bot.command(name='생일확인')
